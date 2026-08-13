@@ -1,38 +1,48 @@
 name: Docker Build -> Push -> Deploy
+
 on:
   push:
-    branches: [ "master" ]
+    branches: ["master"]
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
-        run: docker build . --file Dockerfile --tag my-image-name:latest
-      - name: Setup Java
         uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
         with:
-         distribution: 'temurin'
-         java-version: '17'
+          distribution: "temurin"
+          java-version: "17"
+
       - name: Build Jar
         run: |
-         chmod +x ./mvnw
-         ./mvnw clean package -DskipTests
+          chmod +x ./mvnw
+          ./mvnw clean package -DskipTests
+
       - name: Login to Docker Hub
-        run: docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
       - name: Build Docker Image
-        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/spring-boot-ci-demo:latest .
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/spring-boot-ci-demo:latest .
+
       - name: Push Image to Docker Hub
-       run: docker push ${{ secrets.DOCKER_USERNAME }}/spring-boot-ci-demo:latest
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/spring-boot-ci-demo:latest
 
       - name: SSH and Deploy to EC2
         uses: appleboy/ssh-action@v1
         with:
-        host: "43.220.1.170"
-        username: ${{ secrets.USERNAME }}
-        key: ${{ secrets.KEY }}
-        script: |
-          docker stop spring-boot-app || true
-          docker rm spring-boot-app || true
-          docker pull ${{ secrets.DOCKER_USERNAME }}/docker-ci-cd:latest
-          docker run -d --name spring-boot-app -p 8182:8181 ${{ secrets.DOCKER_USERNAME }}/docker-ci-cd:latest
+          host: "43.220.1.170"
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.KEY }}
+          script: |
+            docker stop spring-boot-app || true
+            docker rm spring-boot-app || true
+            docker pull ${{ secrets.DOCKER_USERNAME }}/spring-boot-ci-demo:latest
+            docker run -d --name spring-boot-app -p 8182:8181 ${{ secrets.DOCKER_USERNAME }}/spring-boot-ci-demo:latest
