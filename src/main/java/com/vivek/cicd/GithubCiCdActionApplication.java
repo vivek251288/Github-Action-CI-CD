@@ -12,7 +12,7 @@ public class GithubCiCdActionApplication {
 	@GetMapping("/welcome")
 	public String hello()
 	{
-		return "Hello CI/CD... This is CI-CD pipeline using Github Actions Hello Hello Hi Vivek";
+		return "Hello CI/CD... This is CI-CD pipeline using Github Actions Hello Hello Hi Vivek now its work correct";
 	}
 	
 	
