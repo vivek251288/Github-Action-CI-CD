@@ -2,7 +2,7 @@ name: Docker Build -> Push -> Deploy
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["master"]
 
 jobs:
   build:
@@ -10,29 +10,41 @@ jobs:
 
     steps:
       - name: Checkout Code
-        run: docker build . --file Dockerfile --tag my-image-name:latest
-      - name: Setup Java
         uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
         with:
-         distribution: 'temurin'
-         java-version: '17'
+          distribution: "temurin"
+          java-version: "17"
+          cache: "maven"
+
       - name: Build Jar
         run: ./mvnw clean package -DskipTests
+
       - name: Login to Docker Hub
-        run: docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Build Docker Image
-        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/spring-boot-ci-demo:latest .
+        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/docker-ci-cd:latest .
+
       - name: Push Image to Docker Hub
-       run: docker push ${{ secrets.DOCKER_USERNAME }}/spring-boot-ci-demo:latest
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/docker-ci-cd:latest
 
       - name: SSH and Deploy to EC2
         uses: appleboy/ssh-action@v1
         with:
-        host: "43.220.1.170"
-        username: ${{ secrets.USERNAME }}
-        key: ${{ secrets.KEY }}
-        script: |
-          docker stop spring-boot-app || true
-          docker rm spring-boot-app || true
-          docker pull ${{ secrets.DOCKER_USERNAME }}/docker-ci-cd:latest
-          docker run -d --name spring-boot-app -p 8182:8181 ${{ secrets.DOCKER_USERNAME }}/docker-ci-cd:latest
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            docker stop spring-boot-app || true
+            docker rm spring-boot-app || true
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/docker-ci-cd:latest
+            docker run -d \
+              --name spring-boot-app \
+              -p 8182:8181 \
+              ${{ secrets.DOCKERHUB_USERNAME }}/docker-ci-cd:latest
